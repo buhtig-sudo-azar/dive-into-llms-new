@@ -103,7 +103,7 @@ export default function App() {
               <Activity className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-violet-400" />
               <span className="text-slate-400 font-sans">
                 {serverState.hasApiKey ? (
-                  <span className="text-violet-400 font-bold">Gemini</span>
+                  <span className="text-violet-400 font-bold">OpenRouter</span>
                 ) : (
                   <span className="text-slate-500">Local</span>
                 )}
