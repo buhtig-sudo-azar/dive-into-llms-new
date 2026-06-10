@@ -13,31 +13,31 @@ import {
   Database, 
   Network, 
   Sparkles, 
-  Settings, 
   Activity, 
   BookOpen, 
   Wifi, 
-  WifiOff 
+  WifiOff,
+  MessageCircle
 } from 'lucide-react';
 
-// Import our interactive chapter components
 import TokenizerChapter from './components/TokenizerChapter';
 import EmbeddingsChapter from './components/EmbeddingsChapter';
 import AttentionChapter from './components/AttentionChapter';
 import SamplingChapter from './components/SamplingChapter';
 import RAGChapter from './components/RAGChapter';
 import AgentMCPChapter from './components/AgentMCPChapter';
+import ChatPopup from './components/ChatPopup';
 
 type ActiveTab = 'tokenizer' | 'embeddings' | 'attention' | 'sampling' | 'rag' | 'agent-mcp';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('tokenizer');
+  const [chatOpen, setChatOpen] = useState(false);
   const [serverState, setServerState] = useState<{ connected: boolean; hasApiKey: boolean }>({
     connected: false,
     hasApiKey: false,
   });
 
-  // Verify the state of the backend server and Gemini API configurations
   useEffect(() => {
     const checkServerHealth = async () => {
       try {
@@ -57,53 +57,55 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col font-sans selection:bg-violet-500/30">
       
-      {/* Prime Header navigation bar */}
-      <header className="border-b border-slate-800 bg-slate-950/80 backdrop-blur-md sticky top-0 z-50 px-4 py-3.5 shadow-md">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+      {/* Header */}
+      <header className="border-b border-slate-800 bg-slate-950/80 backdrop-blur-md sticky top-0 z-50 px-3 sm:px-4 py-3 shadow-md">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
           
-          {/* Logo Title */}
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-gradient-to-br from-violet-600 to-indigo-600 text-white rounded-xl shadow-lg ring-2 ring-violet-500/20">
-              <Terminal className="w-5 h-5" />
+          {/* Logo */}
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 sm:p-2.5 bg-gradient-to-br from-violet-600 to-indigo-600 text-white rounded-lg sm:rounded-xl shadow-lg ring-2 ring-violet-500/20">
+              <Terminal className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="font-bold tracking-tight text-base text-white font-sans uppercase">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="font-bold tracking-tight text-sm sm:text-base text-white font-sans uppercase">
                   Dive into LLMs
                 </h1>
-                <span className="bg-violet-500/10 text-violet-400 text-[10px] font-mono px-2 py-0.5 rounded-full border border-violet-500/20 font-bold uppercase tracking-wider animate-pulse">
-                  Интерактивный симулятор
+                <span className="bg-violet-500/10 text-violet-400 text-[9px] sm:text-[10px] font-mono px-1.5 sm:px-2 py-0.5 rounded-full border border-violet-500/20 font-bold uppercase tracking-wider animate-pulse">
+                  Симулятор
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                Визуальное руководство по внутренним механизмам больших языковых моделей
+              <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 hidden sm:block">
+                Визуальное руководство по внутренним механизмам LLM
               </p>
             </div>
           </div>
 
-          {/* Connection diagnostics states */}
-          <div className="flex items-center gap-3 text-xs bg-slate-900 border border-slate-800 p-1.5 rounded-xl">
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-950 rounded-lg border border-slate-850">
+          {/* Connection status */}
+          <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-xs bg-slate-900 border border-slate-800 p-1 sm:p-1.5 rounded-lg sm:rounded-xl">
+            <div className="flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-1 bg-slate-950 rounded-md sm:rounded-lg border border-slate-800">
               {serverState.connected ? (
                 <>
-                  <Wifi className="w-3.5 h-3.5 text-emerald-500" />
-                  <span className="text-emerald-500 font-bold font-mono">SERVER LIVE</span>
+                  <Wifi className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-500" />
+                  <span className="text-emerald-500 font-bold font-mono hidden sm:inline">SERVER LIVE</span>
+                  <span className="text-emerald-500 font-bold font-mono sm:hidden">LIVE</span>
                 </>
               ) : (
                 <>
-                  <WifiOff className="w-3.5 h-3.5 text-amber-500" />
-                  <span className="text-amber-500 font-bold font-mono">FALLBACK ACTIVE</span>
+                  <WifiOff className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-500" />
+                  <span className="text-amber-500 font-bold font-mono hidden sm:inline">FALLBACK</span>
+                  <span className="text-amber-500 font-bold font-mono sm:hidden">SIM</span>
                 </>
               )}
             </div>
 
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-950 rounded-lg border border-slate-850">
-              <Activity className="w-3.5 h-3.5 text-violet-400" />
-              <span className="text-slate-300 font-sans">
-                Gemini API: {serverState.hasApiKey ? (
-                  <span className="text-violet-400 font-bold">Подключен (Real)</span>
+            <div className="flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-1 bg-slate-950 rounded-md sm:rounded-lg border border-slate-800">
+              <Activity className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-violet-400" />
+              <span className="text-slate-400 font-sans">
+                {serverState.hasApiKey ? (
+                  <span className="text-violet-400 font-bold">Gemini</span>
                 ) : (
-                  <span className="text-slate-400">Симуляция (Local)</span>
+                  <span className="text-slate-500">Local</span>
                 )}
               </span>
             </div>
@@ -112,90 +114,70 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 lg:p-8 space-y-8">
+      {/* Main */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-4 md:p-6 lg:p-8 space-y-4 sm:space-y-6 lg:space-y-8">
         
-        {/* Prime Ribbon navigation bar matching guidelines (No unrequested sidebars) */}
-        <div className="bg-slate-950 border border-slate-800 rounded-2xl p-2 shadow-inner flex flex-wrap gap-1.5 justify-center md:justify-between items-center">
-          
-          <div className="flex flex-wrap gap-1">
-            <button
+        {/* Navigation tabs */}
+        <div className="bg-slate-950 border border-slate-800 rounded-xl sm:rounded-2xl p-1.5 sm:p-2 shadow-inner">
+          <div className="flex flex-wrap gap-1 sm:gap-1.5 justify-center items-center">
+            <TabButton
+              active={activeTab === 'tokenizer'}
               onClick={() => setActiveTab('tokenizer')}
-              className={`px-3.5 py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
-                activeTab === 'tokenizer'
-                  ? 'bg-violet-600 text-white shadow-md font-bold'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-              }`}
-            >
-              <Layers className="w-4 h-4" />
-              1. Токенизация
-            </button>
-            <button
+              activeClass="bg-violet-600"
+              icon={<Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+              label="1. Токенизация"
+              shortLabel="1. Токены"
+            />
+            <TabButton
+              active={activeTab === 'embeddings'}
               onClick={() => setActiveTab('embeddings')}
-              className={`px-3.5 py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
-                activeTab === 'embeddings'
-                  ? 'bg-teal-600 text-white shadow-md font-bold'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-              }`}
-            >
-              <Compass className="w-4 h-4" />
-              2. Эмбеддинги
-            </button>
-            <button
+              activeClass="bg-teal-600"
+              icon={<Compass className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+              label="2. Эмбеддинги"
+              shortLabel="2. Эмбед."
+            />
+            <TabButton
+              active={activeTab === 'attention'}
               onClick={() => setActiveTab('attention')}
-              className={`px-3.5 py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
-                activeTab === 'attention'
-                  ? 'bg-indigo-650 text-white shadow-md font-bold'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-              }`}
-            >
-              <Eye className="w-4 h-4" />
-              3. Самовнимание
-            </button>
-            <button
+              activeClass="bg-indigo-600"
+              icon={<Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+              label="3. Самовнимание"
+              shortLabel="3. Attention"
+            />
+            <TabButton
+              active={activeTab === 'sampling'}
               onClick={() => setActiveTab('sampling')}
-              className={`px-3.5 py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
-                activeTab === 'sampling'
-                  ? 'bg-amber-600 text-white shadow-md font-bold'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-              }`}
-            >
-              <Sliders className="w-4 h-4" />
-              4. Сэмплирование
-            </button>
-            <button
+              activeClass="bg-amber-600"
+              icon={<Sliders className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+              label="4. Сэмплирование"
+              shortLabel="4. Сэмп."
+            />
+            <TabButton
+              active={activeTab === 'rag'}
               onClick={() => setActiveTab('rag')}
-              className={`px-3.5 py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
-                activeTab === 'rag'
-                  ? 'bg-emerald-600 text-white shadow-md font-bold'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-              }`}
-            >
-              <Database className="w-4 h-4" />
-              5. Поиск RAG
-            </button>
-            <button
+              activeClass="bg-emerald-600"
+              icon={<Database className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+              label="5. Поиск RAG"
+              shortLabel="5. RAG"
+            />
+            <TabButton
+              active={activeTab === 'agent-mcp'}
               onClick={() => setActiveTab('agent-mcp')}
-              className={`px-3.5 py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
-                activeTab === 'agent-mcp'
-                  ? 'bg-purple-650 text-white shadow-md font-bold'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-              }`}
-            >
-              <Network className="w-4 h-4" />
-              6. Агенты & MCP
-            </button>
-          </div>
+              activeClass="bg-purple-600"
+              icon={<Network className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+              label="6. Агенты & MCP"
+              shortLabel="6. Агенты"
+            />
 
-          {/* Interactive handbook banner link */}
-          <div className="hidden lg:flex items-center gap-2 text-[11px] text-slate-400 font-mono bg-slate-900 px-3.5 py-1.5 rounded-lg border border-slate-800">
-            <BookOpen className="w-3.5 h-3.5 text-violet-400" />
-            <span>Разделов: 6 / Платформа: Dive-into-LLMs</span>
+            {/* Desktop badge */}
+            <div className="hidden lg:flex items-center gap-2 text-[11px] text-slate-400 font-mono bg-slate-900 px-3.5 py-1.5 rounded-lg border border-slate-800 ml-auto">
+              <BookOpen className="w-3.5 h-3.5 text-violet-400" />
+              <span>6 разделов</span>
+            </div>
           </div>
-
         </div>
 
-        {/* Dynamic Interactive Active Page Panel */}
+        {/* Active chapter */}
         <div className="transition-all duration-300">
           {activeTab === 'tokenizer' && <TokenizerChapter />}
           {activeTab === 'embeddings' && <EmbeddingsChapter />}
@@ -207,19 +189,75 @@ export default function App() {
 
       </main>
 
-      {/* Footer credit labels */}
-      <footer className="border-t border-slate-850 bg-slate-950 py-5 px-4 mt-auto">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 font-sans">
+      {/* Footer */}
+      <footer className="border-t border-slate-800 bg-slate-950 py-4 sm:py-5 px-3 sm:px-4 mt-auto">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 font-sans">
           <div className="flex items-center gap-2">
             <Sparkles className="w-3.5 h-3.5 text-yellow-400" />
-            <span>Интерактивный симулятор «Dive into LLMs» выполнен на React 19 & Tailwind CSS</span>
+            <span>Интерактивный симулятор «Dive into LLMs»</span>
           </div>
-          <div className="text-slate-400 font-medium">
-            Ссылка на оригинальный проект: <a href="https://github.com/buhtig-sudo-azar/dive-into-llms" target="_blank" rel="noreferrer" className="text-violet-400 hover:underline hover:text-violet-300">github.com/buhtig-sudo-azar/dive-into-llms</a>
+          <div className="flex items-center gap-2">
+            <span className="text-slate-600">|</span>
+            <span className="font-semibold bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent text-sm">
+              Создатель AZAR
+            </span>
+            <span className="text-slate-600">|</span>
+            <span className="text-slate-500">React 19 & Tailwind CSS</span>
           </div>
         </div>
       </footer>
 
+      {/* Floating chat button */}
+      {!chatOpen && (
+        <button
+          onClick={() => setChatOpen(true)}
+          className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40 hover:scale-105 transition-all flex items-center justify-center group"
+          aria-label="Открыть чат с AI-наставником"
+        >
+          <MessageCircle className="w-5 h-5 sm:w-6 sm:h-6 group-hover:scale-110 transition-transform" />
+          <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-slate-950 animate-pulse" />
+        </button>
+      )}
+
+      {/* Chat popup */}
+      <ChatPopup
+        activeTab={activeTab}
+        isOpen={chatOpen}
+        onClose={() => setChatOpen(false)}
+      />
+
     </div>
+  );
+}
+
+// Responsive tab button component
+function TabButton({
+  active,
+  onClick,
+  activeClass,
+  icon,
+  label,
+  shortLabel,
+}: {
+  active: boolean;
+  onClick: () => void;
+  activeClass: string;
+  icon: React.ReactNode;
+  label: string;
+  shortLabel: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-2 sm:px-3 md:px-3.5 py-2 sm:py-2.5 text-[10px] sm:text-xs font-semibold rounded-lg sm:rounded-xl transition-all cursor-pointer flex items-center gap-1 sm:gap-2 whitespace-nowrap ${
+        active
+          ? `${activeClass} text-white shadow-md font-bold`
+          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+      }`}
+    >
+      {icon}
+      <span className="hidden sm:inline">{label}</span>
+      <span className="sm:hidden">{shortLabel}</span>
+    </button>
   );
 }
