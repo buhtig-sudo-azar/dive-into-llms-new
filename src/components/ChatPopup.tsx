@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { X, Minimize2, Maximize2, Shrink, Send, Sparkles, MessageSquare, RefreshCw, Cpu } from 'lucide-react';
 import { agents, ChatMessage } from './chatData';
 import { useModelStore } from '../store/model-store';
+import { BeautifulMessage } from './BeautifulMessage';
 
 interface ChatPopupProps {
   activeTab: string;
@@ -331,8 +332,12 @@ export default function ChatPopup({ activeTab, isOpen, onClose }: ChatPopupProps
                 <div className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${msg.role === 'user' ? 'bg-violet-600' : `bg-gradient-to-br ${agent.gradient}`}`}>
                   {msg.role === 'user' ? <span className="text-[10px] text-white font-bold">Я</span> : <Sparkles className="w-3 h-3 text-white" />}
                 </div>
-                <div className={`flex-1 min-w-0 rounded-xl px-3 py-2 text-sm leading-relaxed ${msg.role === 'user' ? 'bg-violet-600/20 text-violet-100' : 'bg-slate-800/50 text-slate-300'}`}>
-                  <div className="whitespace-pre-wrap break-words">{msg.content}</div>
+                <div className={`flex-1 min-w-0 rounded-xl px-3 py-2.5 text-sm leading-relaxed ${msg.role === 'user' ? 'bg-violet-600/20 text-violet-100' : 'bg-slate-800/50 text-slate-300'}`}>
+                  {msg.role === 'user' ? (
+                    <div className="whitespace-pre-wrap break-words">{msg.content}</div>
+                  ) : (
+                    <BeautifulMessage content={msg.content} />
+                  )}
                 </div>
               </div>
             ))}
