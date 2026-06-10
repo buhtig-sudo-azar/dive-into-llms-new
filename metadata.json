@@ -1,0 +1,6 @@
+{
+  "name": "Dive into LLMs",
+  "description": "Interactive educational platform visualizing LLMs: tokenization, attention, embeddings, sampling, RAG, and Agent ReAct loops.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
