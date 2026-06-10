@@ -69,7 +69,7 @@ export default function App() {
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="font-bold tracking-tight text-sm sm:text-base text-white font-sans uppercase">
-                  Dive into LLMs
+                  LLM Explorer
                 </h1>
                 <span className="bg-violet-500/10 text-violet-400 text-[9px] sm:text-[10px] font-mono px-1.5 sm:px-2 py-0.5 rounded-full border border-violet-500/20 font-bold uppercase tracking-wider animate-pulse">
                   Симулятор
@@ -194,7 +194,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 font-sans">
           <div className="flex items-center gap-2">
             <Sparkles className="w-3.5 h-3.5 text-yellow-400" />
-            <span>Интерактивный симулятор «Dive into LLMs»</span>
+            <span>Интерактивный симулятор «LLM Explorer»</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-slate-600">|</span>
