@@ -1,20 +1,13 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Dive into LLMs — Интерактивный симулятор
 
-# Run and deploy your AI Studio app
+Интерактивная платформа для визуального изучения внутренних механизмов больших языковых моделей: токенизация, эмбеддинги, самовнимание, сэмплирование, RAG и агентские протоколы MCP.
 
-This contains everything you need to run your app locally.
+## Запуск локально
 
-View your app in AI Studio: https://ai.studio/apps/8efc8f15-9f63-4944-9bb0-8297ef64f55b
+**Требования:** Node.js
 
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
+1. Установите зависимости:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
+2. Укажите API-ключи в файле `.env.local` (см. `.env.example`)
+3. Запустите приложение:
    `npm run dev`
