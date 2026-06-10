@@ -16,6 +16,7 @@ const MODEL_TIMEOUT_MS = 10000; // 10s per model attempt
 
 // Cache free models list (5 min TTL)
 let cachedFreeModels: string[] = [];
+let cachedFreeModelDetails: { id: string; name: string }[] = [];
 let lastFetchTime = 0;
 const CACHE_TTL = 5 * 60 * 1000;
 
@@ -44,9 +45,11 @@ async function getFreeModels(): Promise<string[]> {
     if (!res.ok) return cachedFreeModels.length > 0 ? cachedFreeModels : getFallbackModels();
     const data = await res.json();
     const models = data?.data || [];
-    cachedFreeModels = models
+    const freeModels = models
       .filter((m: { id: string }) => m.id.endsWith(':free') && !m.id.includes('content-safety'))
-      .map((m: { id: string }) => m.id);
+      .map((m: { id: string; name?: string }) => ({ id: m.id, name: m.name || m.id }));
+    cachedFreeModelDetails = freeModels;
+    cachedFreeModels = freeModels.map((m: { id: string }) => m.id);
     lastFetchTime = now;
     return cachedFreeModels.length > 0 ? cachedFreeModels : getFallbackModels();
   } catch {
@@ -105,6 +108,136 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
+// List free models from OpenRouter
+app.get('/api/models', async (_req, res) => {
+  try {
+    const now = Date.now();
+    if (cachedFreeModelDetails.length > 0 && now - lastFetchTime < CACHE_TTL) {
+      const models = cachedFreeModelDetails.map(m => ({
+        id: m.id,
+        name: m.name,
+        label: m.name.replace(/\s*\(free\)\s*/i, '').trim() || m.id,
+      })).sort((a, b) => a.label.localeCompare(b.label));
+      return res.json({ models });
+    }
+
+    const response = await fetch('https://openrouter.ai/api/v1/models', {
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (!response.ok) {
+      // Return fallback
+      const models = getFallbackModels().map(id => {
+        const parts = id.split('/');
+        const name = parts[parts.length - 1].replace(':free', '');
+        return { id, name, label: name };
+      });
+      return res.json({ models });
+    }
+
+    const data = await response.json();
+    const allModels = data?.data || [];
+    const freeModels = allModels
+      .filter((m: { id: string }) => m.id.endsWith(':free') && !m.id.includes('content-safety'))
+      .map((m: { id: string; name?: string }) => {
+        const label = (m.name || m.id).replace(/\s*\(free\)\s*/i, '').trim() || m.id;
+        return { id: m.id, name: m.name || m.id, label };
+      })
+      .sort((a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label));
+
+    // Update cache
+    cachedFreeModelDetails = freeModels.map(m => ({ id: m.id, name: m.name }));
+    cachedFreeModels = freeModels.map((m: { id: string }) => m.id);
+    lastFetchTime = now;
+
+    res.json({ models: freeModels });
+  } catch {
+    const models = getFallbackModels().map(id => {
+      const parts = id.split('/');
+      const name = parts[parts.length - 1].replace(':free', '');
+      return { id, name, label: name };
+    });
+    res.json({ models });
+  }
+});
+
+// Check model availability
+app.post('/api/models/check', async (req, res) => {
+  const { model, apiToken } = req.body;
+  if (!model || typeof model !== 'string') {
+    return res.status(400).json({ error: 'model is required' });
+  }
+
+  const apiKey = apiToken || OPENROUTER_API_KEY;
+  if (!apiKey) {
+    return res.json({ available: false, reason: 'error', model });
+  }
+
+  const start = Date.now();
+  try {
+    const response = await fetchWithTimeout(OPENROUTER_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://dive-into-llms-new.vercel.app',
+        'X-Title': 'LLM Explorer',
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: 'hi' }],
+        max_tokens: 1,
+        stream: false,
+      }),
+    }, 8000);
+
+    const latency = Date.now() - start;
+
+    if (response.ok) {
+      const limit = response.headers.get('x-ratelimit-limit');
+      const remaining = response.headers.get('x-ratelimit-remaining');
+      const reset = response.headers.get('x-ratelimit-reset');
+
+      return res.json({
+        available: true,
+        model,
+        latency,
+        rateLimit: {
+          limit: limit ? parseInt(limit, 10) : null,
+          remaining: remaining ? parseInt(remaining, 10) : null,
+          reset: reset || null,
+        },
+      });
+    }
+
+    if (response.status === 429) {
+      const limit = response.headers.get('x-ratelimit-limit');
+      const remaining = response.headers.get('x-ratelimit-remaining');
+      const reset = response.headers.get('x-ratelimit-reset');
+
+      return res.json({
+        available: false,
+        reason: 'rate_limited',
+        model,
+        latency,
+        rateLimit: {
+          limit: limit ? parseInt(limit, 10) : null,
+          remaining: remaining ? parseInt(remaining, 10) : null,
+          reset: reset || null,
+        },
+      });
+    }
+
+    if (response.status === 404) {
+      return res.json({ available: false, reason: 'not_found', model, latency });
+    }
+
+    return res.json({ available: false, reason: 'error', model, latency });
+  } catch {
+    return res.json({ available: false, reason: 'error', model, latency: Date.now() - start });
+  }
+});
+
 // Embeddings (still uses Gemini)
 app.post('/api/embeddings', async (req, res) => {
   const { words }: { words: string[] } = req.body;
@@ -137,25 +270,30 @@ app.post('/api/embeddings', async (req, res) => {
 
 // Legacy generate endpoint (non-streaming, for RAG chapter etc.)
 app.post('/api/generate', async (req, res) => {
-  const { prompt, systemInstruction, temperature } = req.body;
+  const { prompt, systemInstruction, temperature, apiToken, model: clientModel } = req.body;
 
-  if (!OPENROUTER_API_KEY) {
-    return res.json({ success: false, text: 'API ключ не настроен.', simulated: true });
+  const apiKey = apiToken || OPENROUTER_API_KEY;
+  if (!apiKey) {
+    return res.json({ success: false, text: 'API ключ не настроен. Добавьте свой токен OpenRouter в настройках.', simulated: true });
   }
 
   try {
     const freeModels = await getFreeModels();
+    const preferredModel = clientModel || '';
+    const modelsToTry = preferredModel
+      ? [preferredModel, ...freeModels.filter(m => m !== preferredModel)]
+      : freeModels;
     const allMessages = [
       { role: 'system', content: systemInstruction || 'Ты — полезный AI-ассистент. Отвечай на русском.' },
       { role: 'user', content: prompt },
     ];
 
-    for (const model of freeModels) {
+    for (const model of modelsToTry) {
       try {
         const response = await fetchWithTimeout(OPENROUTER_URL, {
           method: 'POST',
           headers: {
-            Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+            Authorization: `Bearer ${apiKey}`,
             'Content-Type': 'application/json',
             'HTTP-Referer': 'https://dive-into-llms-new.vercel.app',
             'X-Title': 'LLM Explorer',
@@ -184,10 +322,11 @@ app.post('/api/generate', async (req, res) => {
 
 // Chat endpoint — SSE streaming via OpenRouter
 app.post('/api/chat', async (req, res) => {
-  const { messages, systemPrompt, model: clientModel, max_tokens, temperature: clientTemp } = req.body;
+  const { messages, systemPrompt, model: clientModel, max_tokens, temperature: clientTemp, apiToken } = req.body;
 
-  if (!OPENROUTER_API_KEY) {
-    return res.status(500).json({ error: 'OPENROUTER_API_KEY not configured' });
+  const apiKey = apiToken || OPENROUTER_API_KEY;
+  if (!apiKey) {
+    return res.status(500).json({ error: 'API ключ не настроен. Добавьте свой токен OpenRouter в настройках модели.' });
   }
 
   const maxTokens = max_tokens ?? 2048;
@@ -212,7 +351,7 @@ app.post('/api/chat', async (req, res) => {
         const response = await fetchWithTimeout(OPENROUTER_URL, {
           method: 'POST',
           headers: {
-            Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+            Authorization: `Bearer ${apiKey}`,
             'Content-Type': 'application/json',
             'HTTP-Referer': 'https://dive-into-llms-new.vercel.app',
             'X-Title': 'LLM Explorer',
@@ -248,7 +387,6 @@ app.post('/api/chat', async (req, res) => {
           }
 
           const decoder = new TextDecoder();
-          const encoder = new TextEncoder();
 
           try {
             while (true) {

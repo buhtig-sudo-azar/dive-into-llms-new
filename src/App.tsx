@@ -27,6 +27,8 @@ import SamplingChapter from './components/SamplingChapter';
 import RAGChapter from './components/RAGChapter';
 import AgentMCPChapter from './components/AgentMCPChapter';
 import ChatPopup from './components/ChatPopup';
+import { ModelSelector } from './components/ModelSelector';
+import { useModelStore } from './store/model-store';
 
 type ActiveTab = 'tokenizer' | 'embeddings' | 'attention' | 'sampling' | 'rag' | 'agent-mcp';
 
@@ -37,6 +39,12 @@ export default function App() {
     connected: false,
     hasApiKey: false,
   });
+
+  const { _hydrate, apiToken } = useModelStore();
+
+  useEffect(() => {
+    _hydrate();
+  }, [_hydrate]);
 
   useEffect(() => {
     const checkServerHealth = async () => {
@@ -53,6 +61,9 @@ export default function App() {
     };
     checkServerHealth();
   }, []);
+
+  // Determine if user has their own key or server key
+  const hasKey = apiToken.length > 0 || serverState.hasApiKey;
 
   return (
     <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col font-sans selection:bg-violet-500/30">
@@ -81,33 +92,39 @@ export default function App() {
             </div>
           </div>
 
-          {/* Connection status */}
-          <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-xs bg-slate-900 border border-slate-800 p-1 sm:p-1.5 rounded-lg sm:rounded-xl">
-            <div className="flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-1 bg-slate-950 rounded-md sm:rounded-lg border border-slate-800">
-              {serverState.connected ? (
-                <>
-                  <Wifi className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-500" />
-                  <span className="text-emerald-500 font-bold font-mono hidden sm:inline">SERVER LIVE</span>
-                  <span className="text-emerald-500 font-bold font-mono sm:hidden">LIVE</span>
-                </>
-              ) : (
-                <>
-                  <WifiOff className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-500" />
-                  <span className="text-amber-500 font-bold font-mono hidden sm:inline">FALLBACK</span>
-                  <span className="text-amber-500 font-bold font-mono sm:hidden">SIM</span>
-                </>
-              )}
-            </div>
+          {/* Right side: Model selector + Connection status */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Model Selector */}
+            <ModelSelector />
 
-            <div className="flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-1 bg-slate-950 rounded-md sm:rounded-lg border border-slate-800">
-              <Activity className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-violet-400" />
-              <span className="text-slate-400 font-sans">
-                {serverState.hasApiKey ? (
-                  <span className="text-violet-400 font-bold">OpenRouter</span>
+            {/* Connection status */}
+            <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-xs bg-slate-900 border border-slate-800 p-1 sm:p-1.5 rounded-lg sm:rounded-xl">
+              <div className="flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-1 bg-slate-950 rounded-md sm:rounded-lg border border-slate-800">
+                {serverState.connected ? (
+                  <>
+                    <Wifi className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-500" />
+                    <span className="text-emerald-500 font-bold font-mono hidden sm:inline">SERVER LIVE</span>
+                    <span className="text-emerald-500 font-bold font-mono sm:hidden">LIVE</span>
+                  </>
                 ) : (
-                  <span className="text-slate-500">Local</span>
+                  <>
+                    <WifiOff className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-500" />
+                    <span className="text-amber-500 font-bold font-mono hidden sm:inline">FALLBACK</span>
+                    <span className="text-amber-500 font-bold font-mono sm:hidden">SIM</span>
+                  </>
                 )}
-              </span>
+              </div>
+
+              <div className="flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-1 bg-slate-950 rounded-md sm:rounded-lg border border-slate-800">
+                <Activity className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-violet-400" />
+                <span className="text-slate-400 font-sans">
+                  {hasKey ? (
+                    <span className="text-violet-400 font-bold">OpenRouter</span>
+                  ) : (
+                    <span className="text-slate-500">No Key</span>
+                  )}
+                </span>
+              </div>
             </div>
           </div>
 

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Minimize2, Maximize2, Shrink, Send, Sparkles, MessageSquare, RefreshCw } from 'lucide-react';
+import { X, Minimize2, Maximize2, Shrink, Send, Sparkles, MessageSquare, RefreshCw, Cpu } from 'lucide-react';
 import { agents, ChatMessage } from './chatData';
+import { useModelStore } from '../store/model-store';
 
 interface ChatPopupProps {
   activeTab: string;
@@ -18,16 +19,19 @@ export default function ChatPopup({ activeTab, isOpen, onClose }: ChatPopupProps
   const [isMinimized, setIsMinimized] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [lastError, setLastError] = useState(false);
+  const [usedModel, setUsedModel] = useState<string>('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const agent = agents[activeTab] || agents['tokenizer'];
+  const { getModelForRequest, getTokenForRequest, markModelRateLimited } = useModelStore();
 
   // Reset when tab changes
   useEffect(() => {
     setMessages([]);
     setIsMinimized(false);
     setLastError(false);
+    setUsedModel('');
     // Cancel any in-flight request
     if (currentAbortController) {
       currentAbortController.abort();
@@ -84,12 +88,18 @@ export default function ChatPopup({ activeTab, isOpen, onClose }: ChatPopupProps
         currentMessages.push({ role: 'user', content: trimmed });
       }
 
+      // Get model and token from store
+      const model = getModelForRequest();
+      const apiToken = getTokenForRequest();
+
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: currentMessages,
           systemPrompt: agent.systemPrompt,
+          model,
+          apiToken: apiToken || undefined,
           temperature: 0.7,
           max_tokens: 2048,
         }),
@@ -100,8 +110,10 @@ export default function ChatPopup({ activeTab, isOpen, onClose }: ChatPopupProps
         if (controller.signal.aborted) return;
         const errData = await response.json().catch(() => null);
         const errMsg = errData?.error === 'All models unavailable'
-          ? 'Все модели заняты. Попробуйте подождать пару минут или задайте вопрос снова.'
-          : `Ошибка сервера (${response.status}). Попробуйте ещё раз.`;
+          ? 'Все модели заняты. Попробуйте подождать пару минут или смените модель.'
+          : errData?.error?.includes('API ключ')
+            ? 'API ключ не настроен. Откройте настройки модели и добавьте свой токен OpenRouter.'
+            : `Ошибка сервера (${response.status}). Попробуйте ещё раз.`;
         setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', content: errMsg }]);
         setLastError(true);
         setIsLoading(false);
@@ -142,8 +154,16 @@ export default function ChatPopup({ activeTab, isOpen, onClose }: ChatPopupProps
 
           try {
             const parsed = JSON.parse(data);
-            // Skip custom model_info events
-            if (parsed.type === 'model_info') continue;
+            // Handle custom model_info events
+            if (parsed.type === 'model_info') {
+              if (parsed.model) setUsedModel(parsed.model);
+              if (parsed.rateLimited && Array.isArray(parsed.rateLimited)) {
+                for (const rlModel of parsed.rateLimited) {
+                  markModelRateLimited(rlModel);
+                }
+              }
+              continue;
+            }
             const content = parsed.choices?.[0]?.delta?.content;
             if (content) {
               appendToLastMessage(content);
@@ -160,7 +180,9 @@ export default function ChatPopup({ activeTab, isOpen, onClose }: ChatPopupProps
         if (data !== '[DONE]') {
           try {
             const parsed = JSON.parse(data);
-            if (parsed.type !== 'model_info') {
+            if (parsed.type === 'model_info') {
+              if (parsed.model) setUsedModel(parsed.model);
+            } else {
               const content = parsed.choices?.[0]?.delta?.content;
               if (content) appendToLastMessage(content);
             }
@@ -190,7 +212,7 @@ export default function ChatPopup({ activeTab, isOpen, onClose }: ChatPopupProps
       }
       setIsLoading(false);
     }
-  }, [isLoading, agent.systemPrompt, messages, appendToLastMessage]);
+  }, [isLoading, agent.systemPrompt, messages, appendToLastMessage, getModelForRequest, getTokenForRequest, markModelRateLimited]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -247,7 +269,7 @@ export default function ChatPopup({ activeTab, isOpen, onClose }: ChatPopupProps
   }
 
   return (
-    <div className={`fixed z-50 flex flex-col bg-slate-950 border border-slate-700/50 shadow-2xl rounded-2xl overflow-hidden transition-all duration-300 ease-in-out ${isExpanded ? 'sm:bottom-4 sm:right-4 sm:top-4 sm:w-[calc(100vw-2rem)] sm:max-h-[calc(100vh-2rem)] max-sm:inset-2 max-sm:max-h-[calc(100vh-1rem)]' : 'sm:bottom-20 sm:right-6 sm:w-[400px] sm:max-h-[580px] max-sm:inset-x-3 max-sm:bottom-20 max-sm:top-auto max-sm:max-h-[70vh]'} animate-in slide-in-from-bottom-4 fade-in duration-200`}>
+    <div className={`fixed z-50 flex flex-col bg-slate-950 border border-slate-700/50 shadow-2xl rounded-2xl overflow-hidden transition-all duration-300 ease-in-out ${isExpanded ? 'sm:bottom-4 sm:right-4 sm:top-4 sm:w-[calc(100vw-2rem)] sm:max-h-[calc(100vh-2rem)] max-sm:inset-2 max-sm:max-h-[calc(100vh-1rem)]' : 'sm:bottom-20 sm:right-6 sm:w-[420px] sm:max-h-[600px] max-sm:inset-x-3 max-sm:bottom-20 max-sm:top-auto max-sm:max-h-[70vh]'} animate-in slide-in-from-bottom-4 fade-in duration-200`}>
       {/* Header */}
       <div className="relative flex items-center gap-3 px-4 py-3 border-b border-slate-800 shrink-0">
         <div className={`absolute inset-0 bg-gradient-to-r ${agent.gradient} opacity-[0.08]`} />
@@ -257,7 +279,15 @@ export default function ChatPopup({ activeTab, isOpen, onClose }: ChatPopupProps
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="text-sm font-bold text-slate-100 truncate">{agent.name}</h3>
-            <p className="text-[11px] text-slate-400 truncate">{agent.role}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-[11px] text-slate-400 truncate">{agent.role}</p>
+              {usedModel && (
+                <span className="text-[9px] text-slate-500 font-mono truncate flex items-center gap-0.5" title={`Модель: ${usedModel}`}>
+                  <Cpu className="w-2.5 h-2.5" />
+                  {usedModel.split('/').pop()?.replace(':free', '')}
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-0.5 flex-shrink-0">
             <button onClick={() => setIsExpanded(prev => !prev)} className="h-7 w-7 flex items-center justify-center rounded-lg hover:bg-slate-800 transition-colors" aria-label={isExpanded ? 'Свернуть окно' : 'Развернуть окно'}>
